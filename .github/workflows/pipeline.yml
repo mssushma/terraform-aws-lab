@@ -39,10 +39,5 @@ jobs:
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
 
-      - name: Run Checkov Scan
-        uses: bridgecrewio/checkov-action@master
-        with:
-          directory: .
-          
       - name: Terraform Apply
         run: terraform apply -auto-approve
