@@ -34,5 +34,15 @@ jobs:
       - name: Terraform Plan
         run: terraform plan
 
+      - name: SonarCloud Scan
+        uses: SonarSource/sonarqube-scan-action@v6
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+
+      - name: Run Checkov Scan
+        uses: bridgecrewio/checkov-action@master
+        with:
+          directory: .
+          
       - name: Terraform Apply
         run: terraform apply -auto-approve
