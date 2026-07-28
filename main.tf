@@ -2,6 +2,8 @@ provider "aws" {
   region = var.region
 }
 
+# Latest Amazon Linux 2023 AMI
+
 data "aws_ami" "amazon_linux" {
   most_recent = true
 
@@ -14,6 +16,7 @@ data "aws_ami" "amazon_linux" {
 }
 
 # VPC
+
 resource "aws_vpc" "main" {
   cidr_block = "10.0.0.0/16"
 
@@ -64,6 +67,10 @@ resource "aws_route_table" "public_rt" {
     cidr_block = "0.0.0.0/0"
     gateway_id = aws_internet_gateway.igw.id
   }
+
+  tags = {
+    Name = "public-route-table"
+  }
 }
 
 resource "aws_route_table_association" "public_assoc" {
@@ -74,47 +81,56 @@ resource "aws_route_table_association" "public_assoc" {
 # Security Group
 
 resource "aws_security_group" "ec2_sg" {
+  name        = "terraform-ssh-sg"
+  description = "Security Group for EC2"
+  vpc_id      = aws_vpc.main.id
 
-  name   = "terraform-ssh-sg"
-  vpc_id = aws_vpc.main.id
-
+  # SSH from your IP only
   ingress {
     description = "SSH"
 
-    from_port = 22
-    to_port   = 22
-    protocol  = "tcp"
+    from_port   = 22
+    to_port     = 22
+    protocol    = "tcp"
 
     cidr_blocks = ["167.103.72.80/32"]
   }
 
+  # Website access from anywhere
   ingress {
     description = "HTTP"
 
-    from_port = 80
-    to_port   = 80
-    protocol  = "tcp"
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
 
     cidr_blocks = ["0.0.0.0/0"]
   }
 
+  # Allow outbound traffic
   egress {
-    protocol = "-1"
-
-    from_port = 0
-    to_port   = 0
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
 
     cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = {
+    Name = "terraform-sg"
   }
 }
 
-# EC2
-resource "aws_instance" "server" {
+# EC2 INSTANCE
 
+resource "aws_instance" "server" {
   ami           = data.aws_ami.amazon_linux.id
   instance_type = "t2.micro"
 
   subnet_id = aws_subnet.public.id
+
+  # Explicitly disable automatic public IP
+  associate_public_ip_address = false
 
   vpc_security_group_ids = [
     aws_security_group.ec2_sg.id
@@ -124,11 +140,10 @@ resource "aws_instance" "server" {
               #!/bin/bash
 
               yum update -y
-
               yum install -y httpd
 
-              systemctl start httpd
               systemctl enable httpd
+              systemctl start httpd
 
               echo "<h1>Created by Terraform via GitHub Actions</h1>" > /var/www/html/index.html
               EOF
@@ -136,4 +151,21 @@ resource "aws_instance" "server" {
   tags = {
     Name = "github-actions-ec2"
   }
+}
+
+# ELASTIC IP
+
+resource "aws_eip" "server_eip" {
+  domain = "vpc"
+
+  tags = {
+    Name = "github-actions-eip"
+  }
+}
+
+# ELASTIC IP ASSOCIATION
+
+resource "aws_eip_association" "server_eip_assoc" {
+  instance_id   = aws_instance.server.id
+  allocation_id = aws_eip.server_eip.id
 }
