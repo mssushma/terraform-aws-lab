@@ -2,7 +2,7 @@ provider "aws" {
   region = var.region
 }
 
-# Latest Amazon Linux 2023 AMI
+# Pull Latest Amazon Linux 2023 AMI 
 
 data "aws_ami" "amazon_linux" {
   most_recent = true
